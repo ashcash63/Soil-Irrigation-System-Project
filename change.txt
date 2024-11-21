@@ -1,0 +1,11 @@
+Change History
+
+Version 1.0.0 - 2024-11-20
+Initial Release
+Added STM32CubeIDE project setup with basic initialization code.
+Configured peripherals:
+GPIO: Basic pin configurations.
+ADC: Configured for single-channel input.
+Created .gitignore to exclude build artifacts and IDE-specific files.
+Created README.md 
+Created change.txt
