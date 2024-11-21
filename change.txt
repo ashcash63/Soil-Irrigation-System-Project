@@ -10,3 +10,6 @@ Created .gitignore to exclude build artifacts and IDE-specific files.
 Created README.md 
 Created change.txt
 Added First Version PinOut STM32.PNG
+Added Electrical Schematics.pdf
+Added System Architecture Drawing.pdf
+Added Test Log Sheet.xlsx
