@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f4xx.h"
+#include "stdio.h"
+#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -41,6 +42,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -51,15 +54,11 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_ADC1_Init(void);
+float FlowRate(float k);
+float FlowTime(float volume, float rate);
+void UserInput();
 
-// Variables
-uint16_t soilMoistureValue = 0;  // Raw ADC reading
-uint8_t percentage = 0;          // Soil moisture percentage
-
-// Function Prototypes
-void setup(void);
-uint16_t readADC(void);
-void controlPump(uint8_t moistureLevel);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -85,74 +84,65 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  setup();  // Initial setup
+  /* USER CODE BEGIN Init */
 
-    while (1) {
-        // Step 1: Read soil moisture
-        soilMoistureValue = readADC();
+  /* USER CODE END Init */
 
-        // Step 2: Convert ADC value to percentage
-        percentage = (soilMoistureValue - 490) * 100 / (1023 - 490);  // Adjust calibration values
-        if (percentage > 100) percentage = 100;
-        if (percentage < 0) percentage = 0;
+  /* Configure the system clock */
+  SystemClock_Config();
 
-        // Step 3: Control LEDs and pump based on moisture percentage
-        controlPump(percentage);
-    }
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  MX_ADC1_Init();
+  /* USER CODE BEGIN 2 */
+  //Start the ADC
+  HAL_ADC_Start(&hadc1);
+
+  //Declare Variables
+
+  uint16_t ADC_Value;
+  char msg[20];
+  char high_signal[] = "SET HIGH\r\n";
+  char low_signal[] = "NOT HIGH\r\n";
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+	  sprintf(rate, "Flow Time: %d\r\n", FlowTime);
+	  HAL_UART_Transmit(&huart2, (uint8_t*)rate, strlen(rate), HAL_MAX_DELAY);
+
+
+	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+
+	  ADC_Value = HAL_ADC_GetValue(&hadc1);
+
+	  int reading = ADC_Value*1;
+
+	  sprintf(msg, "%u\r\n", reading);
+	 // HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+    /* USER CODE END WHILE */
+	  if (ADC_Value > 341){
+		  HAL_UART_Transmit(&huart2, (uint8_t *)low_signal, strlen(low_signal), HAL_MAX_DELAY);
+
+	  } else {
+		  HAL_UART_Transmit(&huart2, (uint8_t *)high_signal, strlen(high_signal), HAL_MAX_DELAY);
+
+	  }
+
+	  HAL_Delay(1000);
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
 }
-
-// Function Definitions
-
-// Initial setup for GPIO and ADC
-void setup(void) {
-    // Enable GPIO and ADC clocks
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;  // Enable clock for GPIOA
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;   // Enable clock for ADC1
-
-    // Configure PA0 (analog input for soil moisture sensor)
-    GPIOA->MODER |= GPIO_MODER_MODE0;  // Set PA0 to analog mode (11)
-
-    // Configure PA5 (Green LED), PA6 (White LED), and PA7 (Red LED) as outputs
-    GPIOA->MODER |= GPIO_MODER_MODE5_0 | GPIO_MODER_MODE6_0 | GPIO_MODER_MODE7_0;
-
-    // Configure PA3 (Pump control pin) as output
-    GPIOA->MODER |= GPIO_MODER_MODE3_0;
-
-    // Configure ADC1 for soil moisture sensor
-    ADC1->SQR3 = 0;                 // Set channel 0 (PA0) as the first conversion
-    ADC1->CR2 |= ADC_CR2_ADON;      // Turn on the ADC
-    ADC1->SMPR2 |= ADC_SMPR2_SMP0;  // Set a sampling rate for channel 0
-}
-
-// Read ADC value from the soil moisture sensor
-uint16_t readADC(void) {
-    ADC1->CR2 |= ADC_CR2_SWSTART;       // Start ADC conversion
-    while (!(ADC1->SR & ADC_SR_EOC));   // Wait for conversion to complete
-    return ADC1->DR;                    // Return ADC result
-}
-
-// Control LEDs and pump based on soil moisture level
-void controlPump(uint8_t moistureLevel) {
-    if (moistureLevel < 10) {
-        // Dry soil: Turn on white LED and pump
-        GPIOA->ODR |= GPIO_ODR_OD6;   // Turn on White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD5;  // Turn off Green LED (PA5)
-        GPIOA->ODR |= GPIO_ODR_OD7;   // Turn on Red LED (PA7)
-        GPIOA->ODR &= ~GPIO_ODR_OD3;  // Turn on pump (active low)
-    } else if (moistureLevel > 80) {
-        // Wet soil: Turn on green LED and turn off pump
-        GPIOA->ODR |= GPIO_ODR_OD5;   // Turn on Green LED (PA5)
-        GPIOA->ODR &= ~GPIO_ODR_OD6;  // Turn off White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD7;  // Turn off Red LED (PA7)
-        GPIOA->ODR |= GPIO_ODR_OD3;   // Turn off pump (active low)
-    } else {
-        // Soil is in the moderate range: turn on green LED
-        GPIOA->ODR |= GPIO_ODR_OD5;   // Turn on Green LED (PA5)
-        GPIOA->ODR &= ~GPIO_ODR_OD6;  // Turn off White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD7;  // Turn off Red LED (PA7)
-    }
-}
-
 
 /**
   * @brief System Clock Configuration
@@ -198,6 +188,58 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -253,6 +295,9 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_8, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
@@ -266,11 +311,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PB10 PB8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
 
 /* USER CODE END 4 */
 
