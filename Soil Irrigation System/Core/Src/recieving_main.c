@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32f4xx.h"
+#include "stdio.h"
+#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -33,6 +34,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define k_sandy 0.1
+#define k_clay 0.1
+#define k_loamy 0.05
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,6 +49,13 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart2;
 
+char soilType[50];
+char potSize[20];
+float permeability;
+float potVolume;
+float flowRate;
+float flowTime;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -51,15 +64,8 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+void UserInput();
 
-// Variables
-uint16_t soilMoistureValue = 0;  // Raw ADC reading
-uint8_t percentage = 0;          // Soil moisture percentage
-
-// Function Prototypes
-void setup(void);
-uint16_t readADC(void);
-void controlPump(uint8_t moistureLevel);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -85,74 +91,56 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  setup();  // Initial setup
+  /* USER CODE BEGIN Init */
 
-    while (1) {
-        // Step 1: Read soil moisture
-        soilMoistureValue = readADC();
+  /* USER CODE END Init */
 
-        // Step 2: Convert ADC value to percentage
-        percentage = (soilMoistureValue - 490) * 100 / (1023 - 490);  // Adjust calibration values
-        if (percentage > 100) percentage = 100;
-        if (percentage < 0) percentage = 0;
+  /* Configure the system clock */
+  SystemClock_Config();
 
-        // Step 3: Control LEDs and pump based on moisture percentage
-        controlPump(percentage);
-    }
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  char buffer[100] = {0};
+
+  UserInput();
+
+  /* USER CODE BEGIN 2 */
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+	  HAL_UART_Receive(&huart2, (uint8_t *)buffer, sizeof(buffer), HAL_MAX_DELAY);
+	  HAL_UART_Receive(&huart2, (uint8_t*)buffer, sizeof(buffer), HAL_MAX_DELAY);
+
+	  if (strcmp(buffer, "SET HIGH") == 0) {
+
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+	      HAL_delay(100000); //100 seconds for the purpose of the demo
+
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
+	      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
+	      HAL_delay(flowTime);
+	      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+
+	  } else {
+	      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+	  }
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
 }
-
-// Function Definitions
-
-// Initial setup for GPIO and ADC
-void setup(void) {
-    // Enable GPIO and ADC clocks
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;  // Enable clock for GPIOA
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;   // Enable clock for ADC1
-
-    // Configure PA0 (analog input for soil moisture sensor)
-    GPIOA->MODER |= GPIO_MODER_MODE0;  // Set PA0 to analog mode (11)
-
-    // Configure PA5 (Green LED), PA6 (White LED), and PA7 (Red LED) as outputs
-    GPIOA->MODER |= GPIO_MODER_MODE5_0 | GPIO_MODER_MODE6_0 | GPIO_MODER_MODE7_0;
-
-    // Configure PA3 (Pump control pin) as output
-    GPIOA->MODER |= GPIO_MODER_MODE3_0;
-
-    // Configure ADC1 for soil moisture sensor
-    ADC1->SQR3 = 0;                 // Set channel 0 (PA0) as the first conversion
-    ADC1->CR2 |= ADC_CR2_ADON;      // Turn on the ADC
-    ADC1->SMPR2 |= ADC_SMPR2_SMP0;  // Set a sampling rate for channel 0
-}
-
-// Read ADC value from the soil moisture sensor
-uint16_t readADC(void) {
-    ADC1->CR2 |= ADC_CR2_SWSTART;       // Start ADC conversion
-    while (!(ADC1->SR & ADC_SR_EOC));   // Wait for conversion to complete
-    return ADC1->DR;                    // Return ADC result
-}
-
-// Control LEDs and pump based on soil moisture level
-void controlPump(uint8_t moistureLevel) {
-    if (moistureLevel < 10) {
-        // Dry soil: Turn on white LED and pump
-        GPIOA->ODR |= GPIO_ODR_OD6;   // Turn on White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD5;  // Turn off Green LED (PA5)
-        GPIOA->ODR |= GPIO_ODR_OD7;   // Turn on Red LED (PA7)
-        GPIOA->ODR &= ~GPIO_ODR_OD3;  // Turn on pump (active low)
-    } else if (moistureLevel > 80) {
-        // Wet soil: Turn on green LED and turn off pump
-        GPIOA->ODR |= GPIO_ODR_OD5;   // Turn on Green LED (PA5)
-        GPIOA->ODR &= ~GPIO_ODR_OD6;  // Turn off White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD7;  // Turn off Red LED (PA7)
-        GPIOA->ODR |= GPIO_ODR_OD3;   // Turn off pump (active low)
-    } else {
-        // Soil is in the moderate range: turn on green LED
-        GPIOA->ODR |= GPIO_ODR_OD5;   // Turn on Green LED (PA5)
-        GPIOA->ODR &= ~GPIO_ODR_OD6;  // Turn off White LED (PA6)
-        GPIOA->ODR &= ~GPIO_ODR_OD7;  // Turn off Red LED (PA7)
-    }
-}
-
 
 /**
   * @brief System Clock Configuration
@@ -251,7 +239,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -266,11 +257,59 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB10 PB8 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB4 PB5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+void UserInput(void) {
+
+	 strcpy(soilType, "sandy");
+	 strcpy(potSize, "large");
+
+	 if (strcmp(soilType, "sandy") == 0) {
+	         permeability = 0.1;
+	 } else if (strcmp(soilType, "clay") == 0) {
+	         permeability = 0.1;
+	 } else if (strcmp(soilType, "loamy") == 0) {
+	         permeability = 0.05;
+	 }
+
+	 if (strcmp(potSize, "small") == 0) {
+	         potVolume = 5;
+	 } else if (strcmp(potSize, "medium") == 0) {
+	         potVolume = 10;
+	 } else if (strcmp(potSize, "large") == 0) {
+	         potVolume = 15;
+	 } else if (strcmp(potSize, "extra large") == 0) {
+	         potVolume = 20;
+	 }
+
+	 flowRate = permeability * 100 * 1;
+	 flowTime = potVolume / flowRate;
+
+}
 
 /* USER CODE END 4 */
 
@@ -305,3 +344,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
