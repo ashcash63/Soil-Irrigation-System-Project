@@ -13,3 +13,12 @@ Added First Version PinOut STM32.PNG
 Added Electrical Schematics.pdf
 Added System Architecture Drawing.pdf
 Added Test Log Sheet.xlsx
+
+Version 2.00 - 2024-11-23
+Edited files transmitting and recieving. Changed File into two. 
+
+Version 3.00 -2024-11-24
+Updated transmitting and recieving files. 
+
+Version 4.00 -2024-11-24
+Final changes
