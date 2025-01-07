@@ -1,4 +1,5 @@
 # Soil-Irrigation-System
+Collaborative project developed as part of Engineering Design Course
 Creating an automatic plant watering system using STM32 Microcontrollers to detect soil moisture. 
 
 The irrigation system will monitor soil moisture levels using two STM-32 microcontrollers and sensors to control the water pump to ensure optimal watering based on soil moisture content and environmental factors. The system will have sensors, controllers, and status indicators to automate irrigation. 
