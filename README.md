@@ -1,5 +1,4 @@
 # Soil-Irrigation-System
-Collaborative project developed as part of Engineering Design Course
 Creating an automatic plant watering system using STM32 Microcontrollers to detect soil moisture. 
 
 The irrigation system will monitor soil moisture levels using two STM-32 microcontrollers and sensors to control the water pump to ensure optimal watering based on soil moisture content and environmental factors. The system will have sensors, controllers, and status indicators to automate irrigation. 
@@ -19,3 +18,11 @@ Turn on the red LED to indicate that the water pump has been activated
 Once the correct soil moisture level is reached, Microcontroller #1 will signal Microcontroller #2 to:
 Turn off the red LED
 Turn on the green LED, indicating that the irrigation is complete and the soil has the correct moisture level.
+
+<img width="805" height="602" alt="image" src="https://github.com/user-attachments/assets/1ed33df2-f72a-471e-86c9-f136ec28d8a1" />
+
+Soil Moisture Sensor demo: [https://drive.google.com/drive/u/0/folders/15HXPNm_AyePa2Xh2LSpp277RnzQLPPi2](url)
+
+Water pump demo: [https://drive.google.com/drive/u/0/folders/15HXPNm_AyePa2Xh2LSpp277RnzQLPPi2](url)
+
+
